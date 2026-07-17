@@ -2,3 +2,5 @@ ml/data/raw/
 *.wav
 *.flac
 *.zip
+!ml/data/protocols/real_speech_in_room.wav
+!ml/data/protocols/real_speech_in_smallroom.wav
