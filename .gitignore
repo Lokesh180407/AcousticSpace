@@ -4,4 +4,4 @@ __pycache__/
 *.pyd
 *$py.class
 
-.env
+backend/app/.env
