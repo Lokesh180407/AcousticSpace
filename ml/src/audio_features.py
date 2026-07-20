@@ -56,7 +56,7 @@ def plot_features(features, title="Audio Features", save_path=None):
 
 if __name__ == "__main__":
     # Quick test using a sample audio file
-    sample_path = Path("ml/data/raw/sample/test_audio.wav")
+    sample_path = Path("ml/data/raw/sample/real_speech.wav")
 
     if not sample_path.exists():
         print(f"No sample file found at {sample_path}")
@@ -71,4 +71,4 @@ if __name__ == "__main__":
         print(f"  flatness: {features['flatness'].shape}")
         print(f"  zcr: {features['zcr'].shape}")
 
-        plot_features(features, title="Test Sample", save_path="ml/data/protocols/sample_features.png")
+        plot_features(features, title="Real Speech Sample", save_path="ml/data/protocols/real_speech_features.png")

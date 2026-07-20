@@ -4,3 +4,8 @@ ml/data/raw/
 *.zip
 !ml/data/protocols/real_speech_in_room.wav
 !ml/data/protocols/real_speech_in_smallroom.wav
+
+backend/
+
+__pycache__/
+*.pyc
