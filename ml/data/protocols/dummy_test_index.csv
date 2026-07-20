@@ -1,0 +1,4 @@
+filepath,label
+ml/data/raw/sample/real_speech.wav,bonafide
+ml/data/protocols/real_speech_in_room.wav,spoof
+ml/data/protocols/real_speech_in_smallroom.wav,bonafide
