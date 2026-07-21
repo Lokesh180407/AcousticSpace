@@ -71,10 +71,9 @@ def build_dummy_csv_for_testing(output_path):
 
 
 if __name__ == "__main__":
-    dummy_csv_path = "ml/data/protocols/dummy_test_index.csv"
-    build_dummy_csv_for_testing(dummy_csv_path)
+    real_csv_path = "ml/data/protocols/asvspoof2021_la_index.csv"
 
-    dataset = SpoofDataset(dummy_csv_path)
+    dataset = SpoofDataset(real_csv_path)
     print(f"\nDataset size: {len(dataset)}")
 
     # Test loading a single sample

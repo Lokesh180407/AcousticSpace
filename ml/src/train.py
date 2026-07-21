@@ -99,7 +99,7 @@ def train_model(
 
 if __name__ == "__main__":
     # --- IMPORTANT: update this path to your real ASVspoof CSV ---
-    csv_path = "ml/data/protocols/asvspoof/asvspoof2021_la_index.csv"
+    csv_path = "ml/data/protocols/asvspoof2021_la_index.csv"
 
     train_model(
         csv_path=csv_path,
