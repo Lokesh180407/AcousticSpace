@@ -7,5 +7,10 @@ ml/data/raw/
 
 backend/
 
+ml/data/protocols/asvspoof2021_combined_index.csv
+ml/data/protocols/asvspoof2021_df_index.csv
+ml/data/protocols/asvspoof2021_la_index.csv
+ml/data/protocols/asvspoof2021_pa_index.csv
+
 __pycache__/
 *.pyc
