@@ -32,18 +32,16 @@ OUTPUT_DIR = Path(__file__).resolve().parent.parent / "data" / "protocols"
 # Track definitions: metadata path, audio directories, label column index
 TRACKS = {
     "LA": {
-        "metadata": RAW_DIR / "LA-keys-full" / "keys" / "LA" / "CM" / "trial_metadata.txt",
+        "metadata": RAW_DIR / "keys" / "LA" / "CM" / "trial_metadata.txt",
         "audio_dirs": [
-            RAW_DIR / "ASVspoof2021_LA_eval" / "ASVspoof2021_LA_eval" / "flac",
+            RAW_DIR / "ASVspoof2021_LA_eval" / "flac",
         ],
         "label_col": 5,  # 0-indexed column for bonafide/spoof label
     },
     "DF": {
-        "metadata": RAW_DIR / "DF-keys-full" / "keys" / "DF" / "CM" / "trial_metadata.txt",
+        "metadata": RAW_DIR / "keys" / "DF" / "CM" / "trial_metadata.txt",
         "audio_dirs": [
-            RAW_DIR / "ASVspoof2021_DF_eval_part00" / "ASVspoof2021_DF_eval" / "flac",
-            RAW_DIR / "ASVspoof2021_DF_eval_part01" / "ASVspoof2021_DF_eval" / "flac",
-            RAW_DIR / "ASVspoof2021_DF_eval_part02" / "ASVspoof2021_DF_eval" / "flac",
+            RAW_DIR / "ASVspoof2021_DF_eval" / "flac",
         ],
         "label_col": 5,
     },

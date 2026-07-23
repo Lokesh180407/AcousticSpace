@@ -11,6 +11,10 @@ ml/data/protocols/asvspoof2021_combined_index.csv
 ml/data/protocols/asvspoof2021_df_index.csv
 ml/data/protocols/asvspoof2021_la_index.csv
 ml/data/protocols/asvspoof2021_pa_index.csv
+ml/data/protocols/asvspoof2021_combined_index_clean.csv
+ml/data/protocols/asvspoof2021_df_index_clean.csv
+ml/data/protocols/asvspoof2021_la_index_clean.csv
+ml/data/protocols/asvspoof2021_pa_index_clean.csv
 
 __pycache__/
 *.pyc

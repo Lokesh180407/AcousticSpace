@@ -1,9 +1,18 @@
+import os
+
+# Must be set BEFORE importing librosa/numba — disables JIT compilation
+# to work around Application Control policy blocking numba's DLLs.
+os.environ["NUMBA_DISABLE_JIT"] = "1"
+
 import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import librosa
 import pandas as pd
 from pathlib import Path
+import imageio_ffmpeg
+
+os.environ["PATH"] += os.pathsep + os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe())
 
 
 class SpoofDataset(Dataset):
@@ -11,7 +20,20 @@ class SpoofDataset(Dataset):
     PyTorch Dataset for bonafide/spoof audio classification.
     Expects a CSV with columns: filepath, label (bonafide/spoof)
     Converts each audio file into a log-mel spectrogram tensor on the fly.
+
+    Fixed vs. the original version:
+      - No more unbounded recursion on load failure (was recursing on every
+        bad file with no depth cap -> guaranteed RecursionError once enough
+        failures happen in a row).
+      - The real exception is now printed, not swallowed, so failures are
+        actually diagnosable.
+      - Retries are capped (MAX_RETRIES) and iterative. If every retry fails,
+        we raise loudly instead of returning silently-wrong data -- a model
+        that trains "successfully" on garbage/zero tensors is worse than a
+        loud crash, because it produces misleading results.
     """
+
+    MAX_RETRIES = 5
 
     def __init__(self, csv_path, sr=16000, n_mels=128, fixed_frames=605):
         self.df = pd.read_csv(csv_path)
@@ -27,6 +49,7 @@ class SpoofDataset(Dataset):
 
     def _load_log_mel(self, filepath):
         y, sr = librosa.load(str(filepath), sr=self.sr)
+
         mel = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=self.n_mels)
         log_mel = librosa.power_to_db(mel, ref=np.max)
 
@@ -35,28 +58,55 @@ class SpoofDataset(Dataset):
             pad_width = self.fixed_frames - log_mel.shape[1]
             log_mel = np.pad(log_mel, ((0, 0), (0, pad_width)), mode="constant")
         else:
-            log_mel = log_mel[:, :self.fixed_frames]
+            log_mel = log_mel[:, : self.fixed_frames]
 
         return log_mel
 
     def __getitem__(self, idx):
-        row = self.df.iloc[idx]
-        filepath = row["filepath"]
-        label_str = row["label"]
+        import random
 
-        log_mel = self._load_log_mel(filepath)
+        tried = set()
+        current_idx = idx
 
-        # Shape: (1, n_mels, fixed_frames) — matches model's expected input
-        features = torch.tensor(log_mel, dtype=torch.float32).unsqueeze(0)
-        label = torch.tensor(self.label_map[label_str], dtype=torch.long)
+        for attempt in range(self.MAX_RETRIES):
+            row = self.df.iloc[current_idx]
+            filepath = row["filepath"]
+            label_str = row["label"]
 
-        return features, label
+            try:
+                log_mel = self._load_log_mel(filepath)
+                features = torch.tensor(log_mel, dtype=torch.float32).unsqueeze(0)
+                label = torch.tensor(self.label_map[label_str], dtype=torch.long)
+                return features, label
+
+            except Exception as e:
+                # Print the REAL error -- this is the whole point of the fix.
+                print(
+                    f"[WARNING] Failed to load {filepath} "
+                    f"(attempt {attempt + 1}/{self.MAX_RETRIES}): "
+                    f"{type(e).__name__}: {e}"
+                )
+                tried.add(current_idx)
+                # Pick a new index we haven't already tried this call.
+                remaining = self.MAX_RETRIES - attempt - 1
+                if remaining <= 0:
+                    break
+                current_idx = random.randint(0, len(self.df) - 1)
+                while current_idx in tried and len(tried) < len(self.df):
+                    current_idx = random.randint(0, len(self.df) - 1)
+
+        raise RuntimeError(
+            f"Gave up after {self.MAX_RETRIES} attempts starting from idx {idx}. "
+            f"Tried indices: {tried}. This usually means a large fraction of your "
+            f"dataset split is unreadable -- run check_dataset_integrity.py before "
+            f"training further."
+        )
 
 
 def build_dummy_csv_for_testing(output_path):
     """
     Creates a small placeholder CSV using your existing demo audio files,
-    with FAKE labels — purely to test the Dataset/DataLoader mechanics
+    with FAKE labels -- purely to test the Dataset/DataLoader mechanics
     before real ASVspoof data is ready.
     """
     rows = [
