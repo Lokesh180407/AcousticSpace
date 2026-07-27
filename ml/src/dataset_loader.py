@@ -1,15 +1,10 @@
-import os
-
-# Must be set BEFORE importing librosa/numba — disables JIT compilation
-# to work around Application Control policy blocking numba's DLLs.
-os.environ["NUMBA_DISABLE_JIT"] = "1"
-
 import torch
+import torchaudio
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
-import librosa
 import pandas as pd
 from pathlib import Path
+import os
 import imageio_ffmpeg
 
 os.environ["PATH"] += os.pathsep + os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe())
@@ -31,6 +26,7 @@ class SpoofDataset(Dataset):
         we raise loudly instead of returning silently-wrong data -- a model
         that trains "successfully" on garbage/zero tensors is worse than a
         loud crash, because it produces misleading results.
+      - Uses torchaudio instead of librosa to avoid numba dependency.
     """
 
     MAX_RETRIES = 5
@@ -44,23 +40,42 @@ class SpoofDataset(Dataset):
         # Map string labels to integers: bonafide=0, spoof=1
         self.label_map = {"bonafide": 0, "spoof": 1}
 
+        # Pre-build the mel spectrogram transform (reused for every sample)
+        self.mel_transform = torchaudio.transforms.MelSpectrogram(
+            sample_rate=sr,
+            n_mels=n_mels,
+            n_fft=2048,
+            hop_length=512,
+        )
+        self.amp_to_db = torchaudio.transforms.AmplitudeToDB(top_db=80)
+
     def __len__(self):
         return len(self.df)
 
     def _load_log_mel(self, filepath):
-        y, sr = librosa.load(str(filepath), sr=self.sr)
+        waveform, orig_sr = torchaudio.load(str(filepath))
 
-        mel = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=self.n_mels)
-        log_mel = librosa.power_to_db(mel, ref=np.max)
+        # Resample if needed
+        if orig_sr != self.sr:
+            resampler = torchaudio.transforms.Resample(orig_sr, self.sr)
+            waveform = resampler(waveform)
+
+        # Convert to mono if stereo
+        if waveform.shape[0] > 1:
+            waveform = waveform.mean(dim=0, keepdim=True)
+
+        # Compute log-mel spectrogram
+        mel = self.mel_transform(waveform)        # (1, n_mels, time)
+        log_mel = self.amp_to_db(mel).squeeze(0)   # (n_mels, time)
 
         # Pad or crop time axis so every sample has the same shape
         if log_mel.shape[1] < self.fixed_frames:
             pad_width = self.fixed_frames - log_mel.shape[1]
-            log_mel = np.pad(log_mel, ((0, 0), (0, pad_width)), mode="constant")
+            log_mel = torch.nn.functional.pad(log_mel, (0, pad_width))
         else:
-            log_mel = log_mel[:, : self.fixed_frames]
+            log_mel = log_mel[:, :self.fixed_frames]
 
-        return log_mel
+        return log_mel.numpy()
 
     def __getitem__(self, idx):
         import random
