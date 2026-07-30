@@ -136,6 +136,13 @@ class SpoofDataset(Dataset):
             row = self.df.iloc[current_idx]
             filepath = row["filepath"]
             label_str = row["label"]
+            
+            # Resolve filepath relative to AcousticSpace project root
+            filepath_obj = Path(filepath)
+            if not filepath_obj.exists() and not filepath_obj.is_absolute():
+                script_dir = Path(__file__).parent.resolve()
+                project_root = script_dir.parent.parent
+                filepath = str(project_root / filepath)
 
             try:
                 log_mel = self._load_log_mel(filepath)

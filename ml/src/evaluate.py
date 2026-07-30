@@ -102,11 +102,14 @@ def evaluate_model(
     print("=" * 60)
 
 if __name__ == "__main__":
+    import os
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
     # Point this to your test/validation index CSV
-    test_csv_path = "../data/protocols/dummy_test_index.csv"
+    test_csv_path = os.path.join(script_dir, "../data/protocols/asvspoof2021_combined_index_clean.csv")
     
     evaluate_model(
         csv_path=test_csv_path,
-        checkpoint_path="../data/protocols/best_model.pth",
+        checkpoint_path=os.path.join(script_dir, "../data/protocols/best_model.pth"),
         batch_size=32
     )
