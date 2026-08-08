@@ -1,29 +1,24 @@
 import React, { useCallback, useRef, useState } from "react";
 import "./UploadPage.css";
-import { analyzeAudio, type UploadResponse, type AnalysisResult } from "../api/client";
+import {
+  uploadAudio,
+  analyzeAudio,
+  addToHistory,
+  type UploadResponse,
+  type AnalysisResult,
+} from "../api/client";
 import ResultsPage from "./ResultsPage";
 
 type UploadState = "idle" | "dragging" | "uploading" | "analyzing" | "done" | "error";
 
+interface UploadPageProps {
+  onNavigateToHistory?: () => void;
+}
+
 const ACCEPTED_TYPES = ["audio/wav", "audio/mpeg", "audio/ogg", "audio/flac", "audio/mp4", "audio/x-m4a"];
 const MAX_SIZE_MB = 50;
 
-async function mockUpload(file: File): Promise<UploadResponse> {
-  // Simulate upload delay until Parth's backend is running
-  await new Promise((r) => setTimeout(r, 1200));
-  return {
-    audio: {
-      id: crypto.randomUUID(),
-      original_filename: file.name,
-      file_size_bytes: file.size,
-      status: "uploaded",
-      created_at: new Date().toISOString(),
-    },
-    guest_id: null,
-  };
-}
-
-export default function UploadPage() {
+export default function UploadPage({ onNavigateToHistory }: UploadPageProps) {
   const [state, setState] = useState<UploadState>("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -57,14 +52,8 @@ export default function UploadPage() {
     }, 100);
 
     try {
-      // Try real backend first, fall back to mock
-      let uploadRes: UploadResponse;
-      try {
-        const { uploadAudio } = await import("../api/client");
-        uploadRes = await uploadAudio(file);
-      } catch {
-        uploadRes = await mockUpload(file);
-      }
+      // Upload audio to real backend
+      const uploadRes = await uploadAudio(file);
 
       clearInterval(interval);
       setProgress(100);
@@ -73,8 +62,22 @@ export default function UploadPage() {
       setState("analyzing");
       setProgress(0);
 
+      // Run ML analysis via backend
       const analysisRes = await analyzeAudio(uploadRes.audio.id);
       setAnalysisResult(analysisRes);
+
+      // Save to local history for Week 4
+      if (analysisRes.prediction) {
+        addToHistory({
+          audio_id: uploadRes.audio.id,
+          filename: file.name,
+          file_size_bytes: file.size,
+          label: analysisRes.prediction.label,
+          confidence_score: analysisRes.prediction.confidence_score,
+          analyzed_at: new Date().toISOString(),
+        });
+      }
+
       setState("done");
     } catch (err) {
       clearInterval(interval);
@@ -128,7 +131,14 @@ export default function UploadPage() {
           <div className="topbar-brand-dot" />
           AcousticSpace
         </div>
-        <div className="topbar-badge">Week 3 · Deepfake Detection</div>
+        <div className="topbar-right">
+          <div className="topbar-badge">Deepfake Detection</div>
+          {onNavigateToHistory && (
+            <button className="topbar-history-btn" id="history-nav-btn" onClick={onNavigateToHistory}>
+              📋 History
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Hero */}
@@ -222,7 +232,7 @@ export default function UploadPage() {
         <div className="feature-card">
           <div className="feature-icon-wrap">📊</div>
           <div className="feature-title">Spectrogram Analysis</div>
-          <div className="feature-desc">Fine-tuned AST model detects subtle spectral anomalies invisible to the human ear</div>
+          <div className="feature-desc">CNN model detects subtle spectral anomalies invisible to the human ear</div>
         </div>
       </div>
     </div>

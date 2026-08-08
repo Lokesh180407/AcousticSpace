@@ -45,6 +45,29 @@
   letter-spacing: 0.02em;
 }
 
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-history-btn {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  padding: 0.3rem 0.8rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.topbar-history-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* ── Hero ───────────────────────────────────────────────────── */
 .hero { text-align: center; width: 100%; }
 

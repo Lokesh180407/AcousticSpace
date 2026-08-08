@@ -1,5 +1,5 @@
 // ─── API Client ──────────────────────────────────────────────────────────────
-// Change BASE_URL to match Parth's backend when deployed.
+// Change BASE_URL to match the backend when deployed.
 // Default: FastAPI runs on http://localhost:8000
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -33,6 +33,40 @@ export interface AnalysisResult {
   error?: string;
 }
 
+// ─── Local history for Week 4 ────────────────────────────────────────────────
+export interface HistoryEntry {
+  audio_id: string;
+  filename: string;
+  file_size_bytes: number;
+  label: "real" | "fake";
+  confidence_score: number;
+  analyzed_at: string;
+}
+
+const HISTORY_KEY = "acousticspace_history";
+
+export function getHistory(): HistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function addToHistory(entry: HistoryEntry): void {
+  const history = getHistory();
+  // Avoid duplicates by audio_id
+  const filtered = history.filter((h) => h.audio_id !== entry.audio_id);
+  filtered.unshift(entry); // newest first
+  // Keep last 50
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(filtered.slice(0, 50)));
+}
+
+export function clearHistory(): void {
+  localStorage.removeItem(HISTORY_KEY);
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function getAuthHeader(): Record<string, string> {
   const token = localStorage.getItem("access_token");
@@ -54,7 +88,7 @@ export async function uploadAudio(file: File): Promise<UploadResponse> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch(`${BASE_URL}/audio`, {
+  const res = await fetch(`${BASE_URL}/api/v1/audio`, {
     method: "POST",
     headers: {
       ...getAuthHeader(),
@@ -77,54 +111,30 @@ export async function uploadAudio(file: File): Promise<UploadResponse> {
 
 /**
  * Trigger ML analysis on an uploaded audio file.
- * NOTE: This endpoint will be built by Parth in Week 3.
- * For now returns a mock response if backend is not ready.
+ * Calls the real backend endpoint.
  */
 export async function analyzeAudio(audioId: string): Promise<AnalysisResult> {
-  try {
-    const res = await fetch(`${BASE_URL}/audio/${audioId}/analyze`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...getAuthHeader(),
-        ...getGuestHeader(),
-      },
-    });
+  const res = await fetch(`${BASE_URL}/api/v1/audio/${audioId}/analyze`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeader(),
+      ...getGuestHeader(),
+    },
+  });
 
-    if (!res.ok) throw new Error("Analysis endpoint not ready yet");
-    return res.json();
-  } catch {
-    // ── MOCK response until Parth builds the endpoint ──────────────────────
-    console.warn("⚠️ Using mock ML result — backend analyze endpoint not ready yet.");
-    await new Promise((r) => setTimeout(r, 2500)); // simulate processing
-    const isFake = Math.random() > 0.45;
-    return {
-      audio_id: audioId,
-      status: "completed",
-      prediction: {
-        id: crypto.randomUUID(),
-        label: isFake ? "fake" : "real",
-        confidence_score: isFake
-          ? 0.72 + Math.random() * 0.25
-          : 0.55 + Math.random() * 0.3,
-        model_name: "AcousticSpace-CNN-v1",
-        model_version: "0.1.0",
-        raw_output: {
-          rir_score: 0.83,
-          breathing_alignment: 0.41,
-          spectral_anomaly: 0.76,
-        },
-      },
-    };
-    // ── End mock ───────────────────────────────────────────────────────────
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Analysis failed" }));
+    throw new Error(err.detail || "Analysis failed");
   }
+  return res.json();
 }
 
 /**
  * Fetch stored analysis result for an audio ID.
  */
 export async function getAnalysisResult(audioId: string): Promise<AnalysisResult> {
-  const res = await fetch(`${BASE_URL}/audio/${audioId}/result`, {
+  const res = await fetch(`${BASE_URL}/api/v1/audio/${audioId}/result`, {
     headers: {
       ...getAuthHeader(),
       ...getGuestHeader(),

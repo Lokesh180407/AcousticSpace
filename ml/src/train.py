@@ -40,7 +40,20 @@ def train_model(
 
     # --- Model, loss, optimizer ---
     model = AudioSpoofCNN(n_mels=128, num_classes=2).to(device)
-    criterion = nn.CrossEntropyLoss()
+
+    # --- Compute class weights dynamically from CSV label distribution ---
+    # This handles any imbalance ratio, not just the ~9:1 default.
+    import pandas as pd
+    label_counts = pd.read_csv(csv_path)["label"].value_counts()
+    n_bonafide = label_counts.get("bonafide", 1)
+    n_spoof    = label_counts.get("spoof", 1)
+    n_total    = n_bonafide + n_spoof
+    # Weight = total / (n_classes * class_count)  — balances gradient scale
+    w_bonafide = n_total / (2.0 * n_bonafide)
+    w_spoof    = n_total / (2.0 * n_spoof)
+    class_weights = torch.tensor([w_bonafide, w_spoof], dtype=torch.float32).to(device)
+    print(f"Class weights — bonafide: {w_bonafide:.3f}, spoof: {w_spoof:.3f}")
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     from sklearn.metrics import roc_curve, auc, f1_score, precision_score, recall_score

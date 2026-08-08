@@ -120,7 +120,7 @@ class SpoofDataset(Dataset):
         # Pad or crop time axis so every sample has the same shape
         if log_mel.shape[1] < self.fixed_frames:
             pad_width = self.fixed_frames - log_mel.shape[1]
-            log_mel = F.pad(log_mel, (0, pad_width))
+            log_mel = F.pad(log_mel, (0, pad_width), value=-80.0)
         else:
             log_mel = log_mel[:, :self.fixed_frames]
 
