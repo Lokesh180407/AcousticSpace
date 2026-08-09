@@ -14,3 +14,4 @@ email-validator==2.2.0
 torch
 soundfile
 numpy
+transformers

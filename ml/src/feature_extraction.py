@@ -59,14 +59,32 @@ def estimate_blind_acoustic_parameters(y, sr):
     reverb_energy = np.mean(energy[energy < np.percentile(energy, 50)])
     drr_est = 10 * np.log10((direct_energy + 1e-10) / (reverb_energy + 1e-10))
     
-    # 4. Silence/Pause Stats (replaces breathing-cadence for Month 1)
-    silence_threshold = 0.1 * np.max(energy)
-    silence_ratio = np.sum(energy < silence_threshold) / len(energy)
+    # 4. Breathing Cadence Alignment (Replaces Month 1 silence_ratio)
+    # Natural speech has regular syllable peaks with characteristic breath pauses.
+    # We find peaks in the energy envelope to represent syllables.
+    peak_indices, _ = scipy.signal.find_peaks(energy, distance=sr//10, prominence=0.05 * np.max(energy))
+    if len(peak_indices) > 1:
+        # Calculate intervals between peaks (syllable pacing in seconds)
+        intervals = np.diff(peak_indices) / sr
+        
+        # Deepfakes often have unnaturally consistent or erratic pacing.
+        # We calculate the coefficient of variation (CV) of the intervals.
+        mean_interval = np.mean(intervals)
+        std_interval = np.std(intervals)
+        cadence_variation = float(std_interval / (mean_interval + 1e-10))
+        
+        # Identify "breath pauses" as intervals significantly longer than the mean
+        breath_pauses = np.sum(intervals > (mean_interval + 1.5 * std_interval))
+        breath_rate = float(breath_pauses / (len(y) / sr))
+    else:
+        cadence_variation = 0.0
+        breath_rate = 0.0
     
     return {
         "spectral_decay_rate": float(avg_decay_rate),
         "drr_est_db": float(drr_est),
-        "silence_ratio": float(silence_ratio)
+        "cadence_variation": cadence_variation,
+        "breath_rate": breath_rate
     }
 
 def process_audio_array(y, sr):

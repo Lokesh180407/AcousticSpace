@@ -1,6 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+try:
+    from transformers import ASTForAudioClassification, ASTConfig
+except ImportError:
+    pass # transformers will be required for AST
 
 
 class AudioSpoofCNN(nn.Module):
@@ -45,6 +49,36 @@ class AudioSpoofCNN(nn.Module):
         x = self.fc2(x)  # raw logits, apply softmax/argmax outside
 
         return x
+
+
+class AudioSpoofAST(nn.Module):
+    """
+    HuggingFace Audio Spectrogram Transformer (AST) for spoof detection.
+    Pre-trained weights are fine-tuned for bonafide vs spoof classification.
+    """
+    def __init__(self, num_classes=2, pretrained=False):
+        super(AudioSpoofAST, self).__init__()
+        
+        # Load AST config
+        # Default AST uses 128 mel bins and max 1024 frames. 
+        self.config = ASTConfig(num_labels=num_classes)
+        
+        if pretrained:
+            try:
+                self.ast = ASTForAudioClassification.from_pretrained("MIT/ast-finetuned-audioset-10-10-0.4593", num_labels=num_classes, ignore_mismatched_sizes=True)
+            except Exception:
+                self.ast = ASTForAudioClassification(self.config)
+        else:
+            self.ast = ASTForAudioClassification(self.config)
+
+    def forward(self, x):
+        # x is (batch_size, 1, n_mels, time_frames)
+        # AST expects (batch_size, time_frames, n_mels)
+        x = x.squeeze(1).transpose(1, 2)
+        
+        outputs = self.ast(x)
+        # return logits
+        return outputs.logits
 
 
 if __name__ == "__main__":
