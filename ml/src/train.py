@@ -178,4 +178,4 @@ if __name__ == "__main__":
         epochs=10,
         batch_size=32,
         learning_rate=1e-3,
-    )
+    )
