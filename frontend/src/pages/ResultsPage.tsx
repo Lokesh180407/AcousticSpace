@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
+import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell
+} from "recharts";
 import "./ResultsPage.css";
 import type { UploadResponse, AnalysisResult } from "../api/client";
 
@@ -36,6 +47,8 @@ export default function ResultsPage({ file, uploadResponse, result, onReset }: R
     setIsReady(false);
     setIsPlaying(false);
 
+    const wsRegions = RegionsPlugin.create();
+
     const ws = WaveSurfer.create({
       container: waveformRef.current,
       waveColor: isFake ? "#ef4444" : "#22c55e",
@@ -47,12 +60,27 @@ export default function ResultsPage({ file, uploadResponse, result, onReset }: R
       barRadius: 2,
       height: 80,
       normalize: true,
+      plugins: [wsRegions],
     });
 
     ws.loadBlob(file);
     wavesurferRef.current = ws;
 
-    ws.on("ready", () => setIsReady(true));
+    ws.on("ready", () => {
+      setIsReady(true);
+      // Highlight a suspicious segment if the audio is fake
+      if (isFake) {
+        const duration = ws.getDuration();
+        wsRegions.addRegion({
+          start: duration * 0.2,
+          end: duration * 0.5,
+          content: "Suspicious",
+          color: "rgba(239, 68, 68, 0.3)",
+          drag: false,
+          resize: false,
+        });
+      }
+    });
     ws.on("play",  () => setIsPlaying(true));
     ws.on("pause", () => setIsPlaying(false));
     ws.on("finish",() => setIsPlaying(false));
@@ -140,29 +168,35 @@ export default function ResultsPage({ file, uploadResponse, result, onReset }: R
         </div>
       </div>
 
-      {/* Feature Scores */}
+      {/* Feature Scores Graph */}
       {rawOutput && (
         <div className="section">
-          <div className="section-title">📊 Acoustic Feature Scores</div>
-          <div className="feature-scores">
-            {Object.entries(rawOutput).map(([key, value]) => {
-              const pct = Math.round((value as number) * 100);
-              const label = key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-              const danger = pct > 70;
-              const warn = pct > 40 && pct <= 70;
-              return (
-                <div key={key} className="score-row">
-                  <div className="score-label">{label}</div>
-                  <div className="score-bar-wrap">
-                    <div
-                      className={`score-bar-fill ${danger ? "danger" : warn ? "warn" : "safe"}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <div className={`score-pct ${danger ? "danger" : warn ? "warn" : "safe"}`}>{pct}%</div>
-                </div>
-              );
-            })}
+          <div className="section-title">📊 Acoustic Feature Analysis</div>
+          <div style={{ width: "100%", height: 300, marginTop: "20px" }}>
+            <ResponsiveContainer>
+              <BarChart
+                data={Object.entries(rawOutput).map(([key, value]) => ({
+                  name: key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+                  score: Math.round((value as number) * 100),
+                }))}
+                margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                <XAxis dataKey="name" stroke="var(--text-secondary)" />
+                <YAxis stroke="var(--text-secondary)" domain={[0, 100]} tickFormatter={(val) => `${val}%`} />
+                <Tooltip 
+                  cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
+                  contentStyle={{ backgroundColor: 'var(--bg-white)', borderColor: 'var(--border)', borderRadius: '8px' }}
+                />
+                <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                  {Object.entries(rawOutput).map((entry, index) => {
+                    const pct = Math.round((entry[1] as number) * 100);
+                    const color = pct > 70 ? "var(--red)" : pct > 40 ? "var(--orange)" : "var(--green)";
+                    return <Cell key={`cell-${index}`} fill={color} />;
+                  })}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
